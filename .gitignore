@@ -1,0 +1,23 @@
+# Java/Maven standard gitignore
+target/
+!.mvn/wrapper/maven-wrapper.jar
+!**/src/main/resources/graphql/schema.graphqls
+!**/src/main/resources/graphiql/index.html
+
+# IDEs and Editors
+.idea/
+*.iws
+*.iml
+*.ipr
+.vscode/
+.settings/
+.classpath
+.project
+.factorypath
+
+# Environment variables (private credentials)
+.env
+.env.local
+
+# Logs
+*.log

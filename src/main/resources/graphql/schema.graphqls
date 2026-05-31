@@ -1,0 +1,144 @@
+type Query {
+  familyFinancialStatus(familyId: ID!): FamilyFinancialStatus!
+  studentsInArrears(limit: Int = 50): [StudentArrears!]!
+  collectionDashboard(year: Int!, month: Int!): CollectionDashboard!
+  delinquencyDashboard(year: Int!, month: Int!): DelinquencyDashboard!
+}
+
+type Mutation {
+  login(input: LoginRequestInput!): LoginResponse!
+  registerFamily(input: RegisterFamilyInput!): Family!
+  assignDiscount(input: AssignDiscountInput!): DiscountAssignment!
+  reviewDocument(input: ReviewDocumentInput!): DocumentReview!
+  issueInvoice(input: IssueInvoiceInput!): ReceiptInvoice!
+}
+
+type Subscription {
+  paymentConfirmed: PaymentEvent!
+  documentStatusChanged: DocumentStatusEvent!
+}
+
+type Employee {
+  erpCode: String!
+  name: String!
+  email: String!
+  role: String!
+}
+
+type LoginResponse {
+  token: String!
+  employee: Employee!
+}
+
+type Family {
+  id: ID!
+  externalId: String!
+  tutorName: String!
+  tutorEmail: String!
+  active: Boolean!
+}
+
+type FamilyFinancialStatus {
+  family: Family!
+  totalDebt: Float!
+  riskScore: Float
+  monthsPaid: Int!
+  monthsPending: Int!
+  monthsInArrears: Int!
+}
+
+type StudentArrears {
+  studentExternalId: String!
+  fullName: String!
+  pendingAmount: Float!
+}
+
+type CollectionDashboard {
+  year: Int!
+  month: Int!
+  totalCollected: Float!
+  byMethod: [CollectionByMethod!]!
+}
+
+type CollectionByMethod {
+  paymentMethod: String!
+  amount: Float!
+}
+
+type DelinquencyDashboard {
+  year: Int!
+  month: Int!
+  familiesInArrears: Int!
+  totalDebt: Float!
+}
+
+input LoginRequestInput {
+  email: String!
+  password: String!
+}
+
+input RegisterFamilyInput {
+  externalId: String!
+  tutorName: String!
+  tutorEmail: String!
+}
+
+input AssignDiscountInput {
+  familyId: ID!
+  discountCode: String!
+  percentage: Float!
+}
+
+input ReviewDocumentInput {
+  documentId: ID!
+  reviewerUser: String!
+  status: DocumentReviewStatus!
+  reason: String
+}
+
+input IssueInvoiceInput {
+  familyId: ID!
+  periodCode: String!
+  amount: Float!
+}
+
+enum DocumentReviewStatus {
+  APPROVED
+  REJECTED
+}
+
+type DiscountAssignment {
+  id: ID!
+  familyId: ID!
+  discountCode: String!
+  percentage: Float!
+}
+
+type DocumentReview {
+  id: ID!
+  documentId: ID!
+  reviewerUser: String!
+  status: DocumentReviewStatus!
+  reason: String
+}
+
+type ReceiptInvoice {
+  id: ID!
+  familyId: ID!
+  periodCode: String!
+  amount: Float!
+  storageKey: String!
+}
+
+type PaymentEvent {
+  eventId: String!
+  paymentExternalId: String!
+  amount: Float!
+  method: String!
+}
+
+type DocumentStatusEvent {
+  eventId: String!
+  documentId: ID!
+  status: String!
+}
