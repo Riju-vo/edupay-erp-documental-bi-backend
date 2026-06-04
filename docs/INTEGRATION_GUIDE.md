@@ -22,40 +22,46 @@ Para interactuar con las mutaciones administrativas, se requiere iniciar sesión
 
 ### Sincronización de Pagos (Integración por Eventos)
 Nuestras bases de datos están **completamente separadas** (Database-per-service). No debes conectarte directamente a PostgreSQL `db_erp` para marcar un pago como completado, ni el ERP leerá tu base de datos.
-Todo se realiza de manera asíncrona mediante llamadas REST (Webhooks) temporalmente, simulando un bus de eventos:
+La integración se realiza de forma asíncrona mediante dos canales alternativos:
 
-1. **Cuando un padre paga exitosamente:**
-   - MS-Pagos debe hacer un HTTP POST a `http://<erp-url>/api/integration/events/payment-confirmed`
-   - **Body requerido:**
-     ```json
-     {
-       "eventId": "uuid-unico-del-evento",
-       "paymentExternalId": "txn_12345",
-       "familyId": 123,
-       "paymentMethod": "STRIPE",
-       "amount": 1500.00
-     }
-     ```
-   - El ERP utilizará esto para generar la factura y restar la deuda.
+#### A. A través de RabbitMQ (Método Recomendado y Asíncrono)
+Se utiliza un broker de mensajería para desacoplar ambos servicios. El microservicio de pagos (NestJS) debe publicar eventos hacia el exchange principal:
 
-2. **Cuando un pago falla o se reembolsa:**
-   - MS-Pagos debe hacer un HTTP POST a `http://<erp-url>/api/integration/events/payment-reversed`
-   - **Body requerido:**
-     ```json
-     {
-       "eventId": "uuid-unico-del-evento-reversion",
-       "paymentExternalId": "txn_12345",
-       "familyId": 123,
-       "reason": "FRAUD_DETECTED"
-     }
-     ```
-   - El ERP utilizará esto para colocar la cuenta nuevamente en estado de mora.
+* **Exchange:** `edupay.exchange` (de tipo Topic)
+* **Canales/Routing Keys del ERP (Spring Boot):**
+  * **Confirmación de Pago:** Publicar el payload JSON a la routing key `payment.confirmed`. El ERP lo recibe en la cola `erp.payment.confirmed.queue`.
+  * **Reversión de Pago:** Publicar el payload JSON a la routing key `payment.reversed`. El ERP lo recibe en la cola `erp.payment.reversed.queue`.
+* **Payload requerido para Confirmaciones:**
+  ```json
+  {
+    "eventId": "uuid-unico-del-evento",
+    "paymentExternalId": "txn_12345",
+    "familyId": 123,
+    "paymentMethod": "STRIPE",
+    "amount": 1500.00
+  }
+  ```
+* **Payload requerido para Reversiones:**
+  ```json
+  {
+    "eventId": "uuid-unico-del-evento-reversion",
+    "paymentExternalId": "txn_12345",
+    "familyId": 123,
+    "reason": "FRAUD_DETECTED"
+  }
+  ```
 
-*Nota de Idempotencia:* Si envías el mismo `eventId` dos veces (por error de red), el ERP lo ignorará y devolverá un mensaje `duplicate`, asegurando que no se cobre dos veces.
+#### B. A través de REST Webhooks (Alternativa Síncrona/HTTP)
+Para pruebas rápidas sin broker, el ERP mantiene expuestos los endpoints HTTP directos:
+1. **Confirmar Pago:** `POST http://<erp-url>/api/integration/events/payment-confirmed`
+2. **Reversar Pago:** `POST http://<erp-url>/api/integration/events/payment-reversed`
+*(Los payloads son idénticos a los de RabbitMQ)*
+
+*Nota de Idempotencia:* Independientemente del canal usado (REST o RabbitMQ), el ERP registra cada `eventId` procesado de forma idempotente mediante el Transactional Inbox pattern, ignorando eventos duplicados.
 
 ## 3. Trabajo Pendiente (Deuda Técnica)
 Para completar el 100% de la integración según los requerimientos del proyecto, aún falta implementar:
 - **AWS S3 para Archivos:** El flujo para subir/descargar PDFs y fotos mediante Presigned URLs.
-- **Broker de Mensajería Real:** Reemplazar los endpoints de `IntegrationEventController` (Webhooks REST) por consumidores reales de un broker como Kafka o Amazon SQS.
 - **Seguridad Estricta:** Activar el `JwtAuthenticationFilter` en `SecurityConfig` para obligar al paso del Token.
 - **Schedulers Nocturnos:** Implementar los procesos `@Scheduled` que corren a la medianoche para recalcular la mora y preparar los snapshots del Dashboard de BI.
+

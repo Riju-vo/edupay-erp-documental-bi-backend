@@ -1,0 +1,362 @@
+{
+  "info": {
+    "_postman_id": "8c673ebf-8182-4df3-883a-86718d7f7661",
+    "name": "EduPay Backend API",
+    "description": "Colección de pruebas completa para el Backend de EduPay (ERP + Documental + BI) y su integración con el Microservicio de Pagos.",
+    "schema": "https://schema.getpostman.com/json/collection/v2.1.0/collection.json"
+  },
+  "item": [
+    {
+      "name": "Autenticación",
+      "item": [
+        {
+          "name": "1. Iniciar Sesión (GraphQL)",
+          "event": [
+            {
+              "listen": "test",
+              "script": {
+                "exec": [
+                  "var jsonData = pm.response.json();",
+                  "if (jsonData && jsonData.data && jsonData.data.login && jsonData.data.login.token) {",
+                  "    pm.collectionVariables.set(\"jwt_token\", jsonData.data.login.token);",
+                  "    console.log(\"Token JWT guardado automáticamente en la variable 'jwt_token': \" + jsonData.data.login.token);",
+                  "}"
+                ],
+                "type": "text/javascript"
+              }
+            }
+          ],
+          "request": {
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation {\n  login(input: {\n    email: \"admin@edupay.com\",\n    password: \"admin123\"\n  }) {\n    token\n    employee {\n      erpCode\n      name\n      role\n    }\n  }\n}",
+                "variables": ""
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql"
+            },
+            "description": "Mutation para iniciar sesión con las credenciales por defecto (admin@edupay.com / admin123). Guarda automáticamente el JWT token obtenido en una variable de colección para autorizar las demás peticiones."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Integración Pagos (REST Webhooks)",
+      "item": [
+        {
+          "name": "1. Confirmar Pago (Webhook)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"paymentExternalId\": \"PAY-TX-{{$timestamp}}\",\n  \"familyId\": 1,\n  \"paymentMethod\": \"CREDIT_CARD\",\n  \"amount\": 1200.00\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/integration/events/payment-confirmed"
+            },
+            "description": "Simula el webhook que el Microservicio de Pagos envía cuando un tutor realiza un pago exitoso. Esto actualiza el estado de cuenta de la familia en el ERP, reduce su deuda, genera facturas y emite eventos en tiempo real."
+          },
+          "response": []
+        },
+        {
+          "name": "2. Reversar Pago (Webhook)",
+          "request": {
+            "method": "POST",
+            "header": [
+              {
+                "key": "Content-Type",
+                "value": "application/json",
+                "type": "text"
+              }
+            ],
+            "body": {
+              "mode": "raw",
+              "raw": "{\n  \"eventId\": \"{{$guid}}\",\n  \"paymentExternalId\": \"PAY-TX-99001\",\n  \"familyId\": 1,\n  \"reason\": \"Fondos insuficientes o contracargo del cliente\"\n}",
+              "options": {
+                "raw": {
+                  "language": "json"
+                }
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/api/integration/events/payment-reversed"
+            },
+            "description": "Simula el webhook que el Microservicio de Pagos envía cuando un pago previamente realizado se reversa o falla (ej. contracargo), restaurando la deuda correspondiente."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Consultas GraphQL (ERP & BI)",
+      "item": [
+        {
+          "name": "1. Estado Financiero de Familia",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query {\n  familyFinancialStatus(familyId: \"1\") {\n    totalDebt\n    riskScore\n    monthsPaid\n    monthsPending\n    monthsInArrears\n  }\n}",
+                "variables": ""
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql"
+            },
+            "description": "Obtiene los detalles del estado financiero de una familia (deuda total, puntuación de riesgo, y conteo de meses pagados/pendientes/en mora). La familia con ID 1 (Juan Perez) se inserta mediante la semilla. (Nota: Se omitió el campo anidado 'family' para evitar errores de mapeo en el backend)."
+          },
+          "response": []
+        },
+        {
+          "name": "2. Alumnos en Mora",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query {\n  studentsInArrears(limit: 5) {\n    studentExternalId\n    fullName\n    pendingAmount\n  }\n}",
+                "variables": ""
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql"
+            },
+            "description": "Obtiene una lista ordenada de estudiantes que pertenecen a familias en mora, mostrando su código externo, nombre completo y el monto total pendiente."
+          },
+          "response": []
+        },
+        {
+          "name": "3. Dashboard de Recaudación (BI)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query {\n  collectionDashboard(year: 2026, month: 4) {\n    year\n    month\n    totalCollected\n    byMethod {\n      paymentMethod\n      amount\n    }\n  }\n}",
+                "variables": ""
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql"
+            },
+            "description": "Obtiene la recaudación total consolidada para un mes y año específico, detallando los montos por método de pago (BI Module)."
+          },
+          "response": []
+        },
+        {
+          "name": "4. Dashboard de Morosidad (BI)",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "query {\n  delinquencyDashboard(year: 2026, month: 5) {\n    year\n    month\n    familiesInArrears\n    totalDebt\n  }\n}",
+                "variables": ""
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql"
+            },
+            "description": "Muestra las métricas del módulo de BI acerca de familias con deudas activas e importe total en mora en el periodo consultado."
+          },
+          "response": []
+        }
+      ]
+    },
+    {
+      "name": "Mutaciones GraphQL (ERP & Documental)",
+      "item": [
+        {
+          "name": "1. Registrar Familia",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation {\n  registerFamily(input: {\n    externalId: \"FAM-SANTI99\",\n    tutorName: \"Santiago Cabrera\",\n    tutorEmail: \"santiago.cabrera@uagrm.edu.bo\"\n  }) {\n    id\n    externalId\n    tutorName\n    tutorEmail\n    active\n  }\n}",
+                "variables": ""
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql"
+            },
+            "description": "Registra una nueva familia o tutor responsable en el ERP de EduPay."
+          },
+          "response": []
+        },
+        {
+          "name": "2. Asignar Descuento",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation {\n  assignDiscount(input: {\n    familyId: \"1\",\n    discountCode: \"DESCTO30\",\n    percentage: 30.0\n  }) {\n    id\n    familyId\n    discountCode\n    percentage\n  }\n}",
+                "variables": ""
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql"
+            },
+            "description": "Asigna un porcentaje de descuento sobre las pensiones futuras a una familia determinada en base a su ID."
+          },
+          "response": []
+        },
+        {
+          "name": "3. Revisar Documento",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation {\n  reviewDocument(input: {\n    documentId: \"101\",\n    reviewerUser: \"admin\",\n    status: APPROVED,\n    reason: \"El certificado de nacimiento y el CI son legibles y correctos\"\n  }) {\n    id\n    documentId\n    reviewerUser\n    status\n    reason\n  }\n}",
+                "variables": ""
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql"
+            },
+            "description": "Simula el módulo de gestión documental revisando y cambiando el estado de un documento a APPROVED o REJECTED. Esto gatilla una notificación y actualización en tiempo real."
+          },
+          "response": []
+        },
+        {
+          "name": "4. Emitir Recibo/Factura",
+          "request": {
+            "auth": {
+              "type": "bearer",
+              "bearer": [
+                {
+                  "key": "token",
+                  "value": "{{jwt_token}}",
+                  "type": "string"
+                }
+              ]
+            },
+            "method": "POST",
+            "header": [],
+            "body": {
+              "mode": "graphql",
+              "graphql": {
+                "query": "mutation {\n  issueInvoice(input: {\n    familyId: \"1\",\n    periodCode: \"2026-06\",\n    amount: 1200.0\n  }) {\n    id\n    familyId\n    periodCode\n    amount\n    storageKey\n  }\n}",
+                "variables": ""
+              }
+            },
+            "url": {
+              "raw": "{{baseUrl}}/graphql"
+            },
+            "description": "Emite el PDF de un recibo o factura digital del cobro del mes y año en curso de la familia en el módulo Documental."
+          },
+          "response": []
+        }
+      ]
+    }
+  ],
+  "variable": [
+    {
+      "key": "baseUrl",
+      "value": "http://localhost:8080",
+      "type": "string"
+    },
+    {
+      "key": "jwt_token",
+      "value": "",
+      "type": "string"
+    }
+  ]
+}

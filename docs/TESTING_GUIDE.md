@@ -124,3 +124,57 @@ curl -X POST http://localhost:8080/api/integration/events/payment-reversed \
 
 > [!IMPORTANT]
 > Si intentas mandar el mismo `eventId` dos veces en los endpoints REST, verás que la primera vez te responde `processed` y la segunda te responde `duplicate`. ¡La idempotencia funciona correctamente!
+
+---
+
+## 5. Colección de Postman Compartida
+
+Hemos preparado una colección completa de Postman lista para importar. La puedes encontrar en la carpeta de documentación del proyecto:
+👉 [edupay_postman_collection.json](file:///c:/Users/hp/Desktop/Ingenieria%20de%20Software%202/Segundo%20parcial/edupay-erp-documental-bi-backend/docs/edupay_postman_collection.json)
+
+### Características de la Colección:
+1. **Variables de Entorno Preconfiguradas**: Usa `{{baseUrl}}` (por defecto `http://localhost:8080`) para que puedas cambiar el host a tu entorno de desarrollo o producción (ej. tu base de Railway) en un solo clic.
+2. **Autenticación Automatizada**: Al ejecutar la petición de **Iniciar Sesión (GraphQL)**, un script de Postman extrae automáticamente el token JWT de la respuesta y lo guarda en la variable `{{jwt_token}}` de la colección. Esto autoriza de forma transparente todas las consultas protegidas subsiguientes.
+3. **Estructura Organizada por Módulos**:
+   - **Autenticación**: Iniciar Sesión (GraphQL).
+   - **Integración Pagos (REST Webhooks)**: Eventos de `Confirmar Pago` y `Reversar Pago` adaptados con `familyId` y generadores aleatorios de `$guid` y `$timestamp`.
+   - **Consultas GraphQL (ERP & BI)**: Estado Financiero, Alumnos en Mora y Dashboards de BI.
+   - **Mutaciones GraphQL (ERP & Documental)**: Registro de familia, asignación de descuentos, revisión de documentos y emisión de facturas/recibos digitales.
+
+---
+
+## 6. Pruebas de RabbitMQ (Mensajería Asíncrona)
+
+Para probar la integración asíncrona mediante eventos locales:
+
+### A. Levantar RabbitMQ
+Asegúrate de que **Docker Desktop** esté iniciado en tu máquina y ejecuta en tu consola:
+```bash
+docker compose up -d
+```
+Esto descargará y levantará el broker con la consola de administración web habilitada.
+
+### B. Levantar el ERP (Spring Boot)
+Inicia la aplicación con:
+```bash
+mvn spring-boot:run
+```
+Verás en los logs que la aplicación se conecta exitosamente a `localhost:5672` y declara automáticamente el Exchange `edupay.exchange` y las colas correspondientes.
+
+### C. Publicar un Mensaje de Prueba
+1. Abre en tu navegador la consola web de administración: 👉 **http://localhost:15672** (Usuario: `guest`, Contraseña: `guest`).
+2. Ve a la sección **Queues** y selecciona la cola `erp.payment.confirmed.queue`.
+3. Despliega el bloque **Publish Message**.
+4. En el campo **Payload**, introduce el siguiente JSON y presiona **Publish Message**:
+   ```json
+   {
+     "eventId": "evt-rabbit-manual-101",
+     "paymentExternalId": "PAY-TX-RABBIT-001",
+     "familyId": 1,
+     "paymentMethod": "RABBITMQ_DOCKER",
+     "amount": 1200.00
+   }
+   ```
+5. En la consola donde se ejecuta tu backend Spring Boot, deberías ver la traza de log indicando que el mensaje fue recibido, validado y procesado exitosamente por `RabbitMqListener`.
+
+
