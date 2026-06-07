@@ -3,6 +3,8 @@ type Query {
   studentsInArrears(limit: Int = 50): [StudentArrears!]!
   collectionDashboard(year: Int!, month: Int!): CollectionDashboard!
   delinquencyDashboard(year: Int!, month: Int!): DelinquencyDashboard!
+  listDocuments(status: String): [DocumentView!]!
+  listFamilies: [Family!]!
 }
 
 type Mutation {
@@ -11,6 +13,7 @@ type Mutation {
   assignDiscount(input: AssignDiscountInput!): DiscountAssignment!
   reviewDocument(input: ReviewDocumentInput!): DocumentReview!
   issueInvoice(input: IssueInvoiceInput!): ReceiptInvoice!
+  registerDocument(input: RegisterDocumentInput!): DocumentView!
 }
 
 type Subscription {
@@ -102,6 +105,13 @@ input IssueInvoiceInput {
   amount: Float!
 }
 
+input RegisterDocumentInput {
+  familyId: ID!
+  documentType: String!
+  storageKey: String!
+  uploadedBy: String!
+}
+
 enum DocumentReviewStatus {
   APPROVED
   REJECTED
@@ -141,4 +151,15 @@ type DocumentStatusEvent {
   eventId: String!
   documentId: ID!
   status: String!
+}
+
+type DocumentView {
+  id: ID!
+  familyId: ID!
+  familyName: String!
+  documentType: String!
+  storageKey: String!
+  status: String!
+  uploadedBy: String!
+  uploadedAt: String!
 }

@@ -38,12 +38,15 @@ public class ErpApplicationService implements ErpUseCase {
         int monthsInArrears = (int) statuses.stream().filter(s -> "IN_ARREARS".equalsIgnoreCase(s.getStatus())).count();
         int monthsPending = Math.max(0, statuses.size() - monthsPaid - monthsInArrears);
 
-        return new FamilyFinancialStatusView(
+        FamilyView familyView = new FamilyView(
                 family.getId(),
                 family.getExternalId(),
                 family.getTutorName(),
                 family.getTutorEmail(),
-                family.isActive(),
+                family.isActive()
+        );
+        return new FamilyFinancialStatusView(
+                familyView,
                 totalDebt,
                 null,
                 monthsPaid,
@@ -88,6 +91,13 @@ public class ErpApplicationService implements ErpUseCase {
         discountRepository.save(discount);
         saveAudit("ASSIGN_DISCOUNT", "ERP_FAMILY", family.getId().toString(), "admin", command.discountCode());
         return discount.getId();
+    }
+
+    @Override
+    public List<FamilyView> listFamilies() {
+        return familyRepository.findAll().stream()
+                .map(f -> new FamilyView(f.getId(), f.getExternalId(), f.getTutorName(), f.getTutorEmail(), f.isActive()))
+                .toList();
     }
 
     private void saveAudit(String action, String entityType, String entityId, String actor, String details) {

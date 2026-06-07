@@ -26,7 +26,8 @@ public class GraphqlController {
     private final Sinks.Many<Map<String, Object>> paymentSink = Sinks.many().multicast().onBackpressureBuffer();
     private final Sinks.Many<Map<String, Object>> documentSink = Sinks.many().multicast().onBackpressureBuffer();
 
-    public GraphqlController(ErpUseCase erpUseCase, DocumentUseCase documentUseCase, BiUseCase biUseCase, AuthApplicationService authService) {
+    public GraphqlController(ErpUseCase erpUseCase, DocumentUseCase documentUseCase, BiUseCase biUseCase,
+            AuthApplicationService authService) {
         this.erpUseCase = erpUseCase;
         this.documentUseCase = documentUseCase;
         this.biUseCase = biUseCase;
@@ -53,6 +54,16 @@ public class GraphqlController {
         return biUseCase.delinquencyDashboard(year, month);
     }
 
+    @QueryMapping
+    public List<DocumentView> listDocuments(@Argument String status) {
+        return documentUseCase.listDocuments(status);
+    }
+
+    @QueryMapping
+    public List<bo.edu.uagrm.edupay.application.dto.FamilyView> listFamilies() {
+        return erpUseCase.listFamilies();
+    }
+
     @MutationMapping
     public LoginResponse login(@Argument LoginRequestInput input) {
         return authService.login(new LoginRequest(input.email(), input.password()));
@@ -60,14 +71,18 @@ public class GraphqlController {
 
     @MutationMapping
     public Map<String, Object> registerFamily(@Argument RegisterFamilyInput input) {
-        Long id = erpUseCase.registerFamily(new RegisterFamilyCommand(input.externalId(), input.tutorName(), input.tutorEmail()));
-        return Map.of("id", id, "externalId", input.externalId(), "tutorName", input.tutorName(), "tutorEmail", input.tutorEmail(), "active", true);
+        Long id = erpUseCase
+                .registerFamily(new RegisterFamilyCommand(input.externalId(), input.tutorName(), input.tutorEmail()));
+        return Map.of("id", id, "externalId", input.externalId(), "tutorName", input.tutorName(), "tutorEmail",
+                input.tutorEmail(), "active", true);
     }
 
     @MutationMapping
     public Map<String, Object> assignDiscount(@Argument AssignDiscountInput input) {
-        Long id = erpUseCase.assignDiscount(new AssignDiscountCommand(input.familyId(), input.discountCode(), input.percentage()));
-        return Map.of("id", id, "familyId", input.familyId(), "discountCode", input.discountCode(), "percentage", input.percentage());
+        Long id = erpUseCase
+                .assignDiscount(new AssignDiscountCommand(input.familyId(), input.discountCode(), input.percentage()));
+        return Map.of("id", id, "familyId", input.familyId(), "discountCode", input.discountCode(), "percentage",
+                input.percentage());
     }
 
     @MutationMapping
@@ -78,16 +93,29 @@ public class GraphqlController {
                 DocumentReviewStatus.valueOf(input.status().name()),
                 input.reason()));
 
-        Map<String, Object> event = Map.of("eventId", java.util.UUID.randomUUID().toString(), "documentId", input.documentId(), "status", input.status().name());
+        Map<String, Object> event = Map.of("eventId", java.util.UUID.randomUUID().toString(), "documentId",
+                input.documentId(), "status", input.status().name());
         documentSink.tryEmitNext(event);
 
-        return Map.of("id", id, "documentId", input.documentId(), "reviewerUser", input.reviewerUser(), "status", input.status().name(), "reason", input.reason());
+        return Map.of("id", id, "documentId", input.documentId(), "reviewerUser", input.reviewerUser(), "status",
+                input.status().name(), "reason", input.reason());
+    }
+
+    @MutationMapping
+    public DocumentView registerDocument(@Argument RegisterDocumentInput input) {
+        return documentUseCase.registerDocument(
+                Long.parseLong(input.familyId()),
+                input.documentType(),
+                input.storageKey(),
+                input.uploadedBy());
     }
 
     @MutationMapping
     public Map<String, Object> issueInvoice(@Argument IssueInvoiceInput input) {
-        Long id = documentUseCase.issueInvoice(new IssueInvoiceCommand(input.familyId(), input.periodCode(), input.amount()));
-        return Map.of("id", id, "familyId", input.familyId(), "periodCode", input.periodCode(), "amount", input.amount(), "storageKey", "invoices/" + input.familyId() + "/" + input.periodCode() + ".pdf");
+        Long id = documentUseCase
+                .issueInvoice(new IssueInvoiceCommand(input.familyId(), input.periodCode(), input.amount()));
+        return Map.of("id", id, "familyId", input.familyId(), "periodCode", input.periodCode(), "amount",
+                input.amount(), "storageKey", "invoices/" + input.familyId() + "/" + input.periodCode() + ".pdf");
     }
 
     @SubscriptionMapping
@@ -101,14 +129,28 @@ public class GraphqlController {
     }
 
     public void emitPaymentEvent(String eventId, String paymentExternalId, String method, double amount) {
-        paymentSink.tryEmitNext(Map.of("eventId", eventId, "paymentExternalId", paymentExternalId, "method", method, "amount", amount));
+        paymentSink.tryEmitNext(
+                Map.of("eventId", eventId, "paymentExternalId", paymentExternalId, "method", method, "amount", amount));
     }
 
-    public record RegisterFamilyInput(String externalId, String tutorName, String tutorEmail) {}
-    public record AssignDiscountInput(Long familyId, String discountCode, double percentage) {}
-    public record ReviewDocumentInput(Long documentId, String reviewerUser, DocumentReviewStatus status, String reason) {}
-    public record IssueInvoiceInput(Long familyId, String periodCode, double amount) {}
-    public record LoginRequestInput(String email, String password) {}
+    public record RegisterFamilyInput(String externalId, String tutorName, String tutorEmail) {
+    }
+
+    public record AssignDiscountInput(Long familyId, String discountCode, double percentage) {
+    }
+
+    public record ReviewDocumentInput(Long documentId, String reviewerUser, DocumentReviewStatus status,
+            String reason) {
+    }
+
+    public record IssueInvoiceInput(Long familyId, String periodCode, double amount) {
+    }
+
+    public record LoginRequestInput(String email, String password) {
+    }
+
+    public record RegisterDocumentInput(String familyId, String documentType, String storageKey, String uploadedBy) {
+    }
 
     @GraphQlExceptionHandler
     public GraphQLError handle(Throwable ex) {

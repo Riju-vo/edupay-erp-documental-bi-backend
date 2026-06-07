@@ -1,15 +1,10 @@
 package bo.edu.uagrm.edupay.application.dto;
 
 public record FamilyFinancialStatusView(
-        Long familyId,
-        String externalId,
-        String tutorName,
-        String tutorEmail,
-        boolean active,
+        FamilyView family,
         double totalDebt,
         Double riskScore,
         int monthsPaid,
         int monthsPending,
         int monthsInArrears
-) {
-}
+) {}
