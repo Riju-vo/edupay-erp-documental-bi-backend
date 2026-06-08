@@ -5,5 +5,6 @@ import java.io.Serializable;
 
 public record TokenValidationResponseDto(
         EmployeeEntity employee,
-        String message
+        String message,
+        Boolean isSuccess
 ) implements Serializable {}

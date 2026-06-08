@@ -77,13 +77,13 @@ public class RabbitMqListener {
         try {
             EmployeeEntity employee = authApplicationService.getEmployeeFromToken(request.token());
             log.info("Token valido para empleado: {}", employee.getErpCode());
-            return new TokenValidationResponseDto(employee, "Success");
+            return new TokenValidationResponseDto(employee, "Success", true);
         } catch (JwtException e) {
             log.warn("Error de validacion de token JWT: {}", e.getMessage());
-            return new TokenValidationResponseDto(null, e.getMessage());
+            return new TokenValidationResponseDto(null, e.getMessage(), false);
         } catch (Exception e) {
             log.warn("Error al buscar el empleado para el token: {}", e.getMessage());
-            return new TokenValidationResponseDto(null, e.getMessage());
+            return new TokenValidationResponseDto(null, e.getMessage(), false);
         }
     }
 
