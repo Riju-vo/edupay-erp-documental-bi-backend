@@ -46,4 +46,14 @@ public class AuthApplicationService {
         
         return new LoginResponse(token, view);
     }
+
+    public EmployeeEntity getEmployeeFromToken(String token) {
+        String erpCode = jwtProvider.validateAndGetSubject(token);
+        EmployeeEntity employee = employeeRepository.findByErpCode(erpCode)
+                .orElseThrow(() -> new RuntimeException("Employee not found for code: " + erpCode));
+        if (!employee.isActive()) {
+            throw new RuntimeException("Employee account is inactive");
+        }
+        return employee;
+    }
 }

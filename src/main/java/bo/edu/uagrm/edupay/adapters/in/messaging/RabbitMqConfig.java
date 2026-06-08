@@ -11,13 +11,15 @@ import org.springframework.context.annotation.Configuration;
 public class RabbitMqConfig {
 
     public static final String EXCHANGE_NAME = "edupay.exchange";
-    
+
     public static final String ERP_CONFIRMED_QUEUE = "erp.payment.confirmed.queue";
     public static final String ERP_REVERSED_QUEUE = "erp.payment.reversed.queue";
     public static final String NEST_PAYMENT_QUEUE = "payment_queue";
-
+    public static final String EMPLOYEE_VALIDATION_QUEUE = "employee.auth.queue";
+    
     public static final String CONFIRMED_ROUTING_KEY = "payment.confirmed";
     public static final String REVERSED_ROUTING_KEY = "payment.reversed";
+    public static final String EMPLOYEE_VALIDATION_ROUTING_KEY = "employee.validation";
 
     @Bean
     public TopicExchange edupayExchange() {
@@ -40,6 +42,12 @@ public class RabbitMqConfig {
     }
 
     @Bean
+    public Queue employeeValidationQueue() {
+        return new Queue(EMPLOYEE_VALIDATION_QUEUE, true);
+    }
+
+
+    @Bean
     public Binding bindingConfirmed(Queue erpConfirmedQueue, TopicExchange edupayExchange) {
         return BindingBuilder.bind(erpConfirmedQueue).to(edupayExchange).with(CONFIRMED_ROUTING_KEY);
     }
@@ -47,6 +55,11 @@ public class RabbitMqConfig {
     @Bean
     public Binding bindingReversed(Queue erpReversedQueue, TopicExchange edupayExchange) {
         return BindingBuilder.bind(erpReversedQueue).to(edupayExchange).with(REVERSED_ROUTING_KEY);
+    }
+
+    @Bean
+    public Binding bindingEmployeeValidation(Queue employeeValidationQueue, TopicExchange edupayExchange) {
+        return BindingBuilder.bind(employeeValidationQueue).to(edupayExchange).with(EMPLOYEE_VALIDATION_ROUTING_KEY);
     }
 
     @Bean

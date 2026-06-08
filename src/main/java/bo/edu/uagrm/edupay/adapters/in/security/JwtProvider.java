@@ -24,6 +24,15 @@ public class JwtProvider {
                 .issuedAt(now)
                 .expiration(validity)
                 .signWith(key)
-                .compact();
+            .compact();
+    }
+
+    public String validateAndGetSubject(String token) {
+        return Jwts.parser()
+                .verifyWith(key)
+                .build()
+                .parseSignedClaims(token)
+                .getPayload()
+                .getSubject();
     }
 }
