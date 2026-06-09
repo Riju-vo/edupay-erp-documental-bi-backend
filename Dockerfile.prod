@@ -1,0 +1,37 @@
+# ────────────────────────────────────────────────────────────────
+# ms-erp — Dockerfile de producción
+# ────────────────────────────────────────────────────────────────
+FROM maven:3.9-eclipse-temurin-21 AS builder
+
+WORKDIR /app
+
+# Cachear dependencias Maven
+COPY pom.xml .
+RUN mvn dependency:go-offline -q
+
+COPY src ./src
+RUN mvn package -DskipTests -q -Pprod 2>/dev/null || mvn package -DskipTests -q
+
+# ── Runtime ──────────────────────────────────────────────────────
+FROM eclipse-temurin:21-jre-alpine
+
+RUN addgroup -S edupay && adduser -S edupay -G edupay
+
+WORKDIR /app
+
+COPY --from=builder /app/target/*.jar app.jar
+
+RUN chown edupay:edupay app.jar
+
+USER edupay
+
+# Healthcheck
+HEALTHCHECK --interval=30s --timeout=5s --start-period=30s --retries=5 \
+    CMD wget -qO- http://localhost:8080/actuator/health || exit 1
+
+EXPOSE 8080
+
+ENTRYPOINT ["java", \
+    "-XX:+UseContainerSupport", \
+    "-XX:MaxRAMPercentage=75.0", \
+    "-jar", "app.jar"]
